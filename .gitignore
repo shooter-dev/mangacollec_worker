@@ -66,6 +66,9 @@ ENV/
 env.bak/
 venv.bak/
 
+#database
+results.db
+
 #Pycharm
 .idea
 
