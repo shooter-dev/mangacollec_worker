@@ -1,0 +1,1 @@
+# mangacollec_worker
