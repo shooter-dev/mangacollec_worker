@@ -125,15 +125,6 @@ def task_save_database_volume(self, datas):
 
 
 def _save_sql(df):
-    engine: Engine = create_engine(
-        (
-            f"postgresql+psycopg2://{POSTGRES_USER}:"
-            f"{POSTGRES_PASSWORD}@"
-            f"{POSTGRES_HOST}:"
-            f"{POSTGRES_PORT}/"
-            f"{POSTGRES_DB}"
-        )
-    )
     # df.set_index(["YEAR","MONTH","DAY","HOUR"])
 
     print(df.index.name)  # ← doit afficher None
