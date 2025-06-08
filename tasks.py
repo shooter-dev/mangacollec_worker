@@ -17,19 +17,18 @@ from mangacollec_api.entity.author import Author
 from mangacollec_api.entity.edition import Edition
 from mangacollec_api.entity.genre import Genre
 from mangacollec_api.entity.job import Job
-from mangacollec_api.entity.kind import Kind
 from mangacollec_api.entity.publisher import Publisher
 from mangacollec_api.entity.task import Task as Tache
 from mangacollec_api.entity.serie import Serie
 from mangacollec_api.entity.serie_end import SerieEndpointEntity
 from mangacollec_api.entity.volume import Volume
-from pandas import DataFrame, Series
+from pandas import DataFrame
 from sqlalchemy import create_engine, Engine
 
 from mangacollec_api.client import MangaCollecAPIClient
 from mangacollec_api.endpoints.serie_endpoint import SerieEndpoint
 
-from config import MQ_USER, MQ_PASSWORD, MQ_HOST, POSTGRES_DB, POSTGRES_PORT, POSTGRES_HOST, POSTGRES_PASSWORD, \
+from conf.config import MQ_USER, MQ_PASSWORD, MQ_HOST, POSTGRES_DB, POSTGRES_PORT, POSTGRES_HOST, POSTGRES_PASSWORD, \
     POSTGRES_USER, POSTGRES_TABLE, CLIENT_ID, CLIENT_SECRET
 
 broker = f"pyamqp://{MQ_USER}:{MQ_PASSWORD}@{MQ_HOST}//"
@@ -271,9 +270,6 @@ def clean_serie_donnee(data_endpoint: SerieEndpointEntity) -> Tuple[List[Dict], 
     tasks: List[Tache] = data_endpoint.tasks
     list_kinds: List[str] = [str(kind) for kind in data_endpoint.kinds]
 
-
-    from dataclasses import is_dataclass
-
     print('DD ---->', data_endpoint)
     for volume in data_endpoint.volumes:
         datas: Dict = volume
@@ -349,7 +345,5 @@ def _init_date_to_data(data: Dict[str, any]) -> Dict:
 
 if __name__ == '__main__':
     # Démarre le worker via la CLI intégrée
-    import sys
-    from celery.__main__ import main as celery_main
 
     app.start()
