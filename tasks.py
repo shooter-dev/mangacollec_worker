@@ -2,6 +2,7 @@
 import datetime
 import json
 import os
+import re
 import time
 
 from logging import Logger
@@ -194,20 +195,22 @@ def _save_sql(df) -> None:
 
 
 def _save_csv(df) -> None:
+    if df.empty or 'serie_title' not in df.columns:
+        raise ValueError("Le DataFrame est vide ou ne contient pas la colonne 'serie_title'.")
 
-    os.makedirs(FOLDER_TO_CSV, exist_ok=True)  # Crée le dossier s’il n'existe pas
+    os.makedirs(FOLDER_TO_CSV, exist_ok=True)
 
-    title = str(df['serie_title'][0]).replace(' ', '_').replace("'", '_').upper()
+    title: str = str(df['serie_title'][0])
 
-    filename = f"{title}.csv"
+    filename = re.sub(r'[^\w\-_]', '_', title) + '.csv'
 
-    df.to_csv(path_or_buf=os.path.join(FOLDER_TO_CSV, filename), index=False)
+    full_path = os.path.join(FOLDER_TO_CSV, filename)
+    df.to_csv(path_or_buf=full_path, index=False)
+    print(f"Fichier CSV enregistré : {full_path}")
 
 
 def _add_editions_to_data(data_volume: Dict[str, any], editions: List[Edition]) -> None:
     for edition in editions:
-        print(edition)
-
         is_edition_to_volume_curent: bool = data_volume['edition_id'] == edition.id
 
         if is_edition_to_volume_curent:
