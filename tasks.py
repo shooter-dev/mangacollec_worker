@@ -23,7 +23,6 @@ from mangacollec_api.entity.serie import Serie
 from mangacollec_api.entity.serie_end import SerieEndpointEntity
 from mangacollec_api.entity.volume import Volume
 from pandas import DataFrame
-from sqlalchemy import create_engine, Engine
 
 from mangacollec_api.client import MangaCollecAPIClient
 from mangacollec_api.endpoints.serie_endpoint import SerieEndpoint
