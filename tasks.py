@@ -188,7 +188,9 @@ def task_call_serie_api(self: Task, id: str, proxy: Dict) -> bool:
         for edition in editions:
             print(edition)
 
-            if data_volume['edition_id'] == edition.id:
+            is_edition_to_volume_curent: bool = data_volume['edition_id'] == edition.id
+
+            if is_edition_to_volume_curent:
                 data_volume['edition_title'] = edition.title
                 data_volume['edition_parent_id'] = edition.parent_edition_id
                 data_volume['edition_volumes_count'] = edition.volumes_count
