@@ -348,8 +348,3 @@ def _init_date_to_data(data: Dict[str, any]) -> Dict:
     data['HOUR'] = now.hour
 
     return data
-
-if __name__ == '__main__':
-    # Démarre le worker via la CLI intégrée
-
-    app.start()
