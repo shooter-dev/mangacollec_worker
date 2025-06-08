@@ -29,7 +29,7 @@ from mangacollec_api.client import MangaCollecAPIClient
 from mangacollec_api.endpoints.serie_endpoint import SerieEndpoint
 
 from conf.config import MQ_USER, MQ_PASSWORD, MQ_HOST, POSTGRES_DB, POSTGRES_PORT, POSTGRES_HOST, POSTGRES_PASSWORD, \
-    POSTGRES_USER, POSTGRES_TABLE, CLIENT_ID, CLIENT_SECRET
+    POSTGRES_USER, POSTGRES_TABLE, CLIENT_ID, CLIENT_SECRET, ENGINE
 
 broker = f"pyamqp://{MQ_USER}:{MQ_PASSWORD}@{MQ_HOST}//"
 
@@ -138,7 +138,7 @@ def _save_sql(df):
 
     print(df.index.name)  # ← doit afficher None
 
-    df.to_sql(name=POSTGRES_TABLE, con=engine, if_exists="append", index=False)
+    df.to_sql(name=POSTGRES_TABLE, con=ENGINE, if_exists="append", index=False)
 
 
 def _save_csv(df):

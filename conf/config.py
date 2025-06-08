@@ -1,5 +1,7 @@
 import os
 
+from sqlalchemy import Engine, create_engine
+
 #IMAGE
 IMAGE_PATH=""
 
@@ -19,3 +21,13 @@ POSTGRES_HOST = os.environ.get('POSTGRES_HOST')
 POSTGRES_PORT = os.environ.get('POSTGRES_PORT')
 POSTGRES_DB = os.environ.get('POSTGRES_DB')
 POSTGRES_TABLE = os.environ.get('POSTGRES_TABLE')
+
+ENGINE: Engine = create_engine(
+        (
+            f"postgresql+psycopg2://{POSTGRES_USER}:"
+            f"{POSTGRES_PASSWORD}@"
+            f"{POSTGRES_HOST}:"
+            f"{POSTGRES_PORT}/"
+            f"{POSTGRES_DB}"
+        )
+    )
