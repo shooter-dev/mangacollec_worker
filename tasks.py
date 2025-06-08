@@ -28,8 +28,7 @@ from sqlalchemy import create_engine, Engine
 from mangacollec_api.client import MangaCollecAPIClient
 from mangacollec_api.endpoints.serie_endpoint import SerieEndpoint
 
-from conf.config import MQ_USER, MQ_PASSWORD, MQ_HOST, POSTGRES_DB, POSTGRES_PORT, POSTGRES_HOST, POSTGRES_PASSWORD, \
-    POSTGRES_USER, POSTGRES_TABLE, CLIENT_ID, CLIENT_SECRET, ENGINE
+from conf.config import MQ_USER, MQ_PASSWORD, MQ_HOST, POSTGRES_TABLE, CLIENT_ID, CLIENT_SECRET, ENGINE
 
 broker = f"pyamqp://{MQ_USER}:{MQ_PASSWORD}@{MQ_HOST}//"
 
