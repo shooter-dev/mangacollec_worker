@@ -3,10 +3,10 @@ import os
 from sqlalchemy import Engine, create_engine
 
 #IMAGE
-FOLDER_TO_IMAGE_VOLUME = "./images/volume"
+FOLDER_TO_IMAGE_VOLUME = "./images/volume/"
 
 # CSV
-FOLDER_TO_CSV = "./csv"
+FOLDER_TO_CSV = "./csv/"
 
 #MANGACOLLEC
 CLIENT_ID = os.environ.get('CLIENT_ID')

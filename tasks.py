@@ -27,7 +27,8 @@ from pandas import DataFrame
 from mangacollec_api.client import MangaCollecAPIClient
 from mangacollec_api.endpoints.serie_endpoint import SerieEndpoint
 
-from conf.config import MQ_USER, MQ_PASSWORD, MQ_HOST, POSTGRES_TABLE, CLIENT_ID, CLIENT_SECRET, ENGINE
+from conf.config import MQ_USER, MQ_PASSWORD, MQ_HOST, POSTGRES_TABLE, CLIENT_ID, CLIENT_SECRET, ENGINE, FOLDER_TO_CSV, \
+    FOLDER_TO_IMAGE_VOLUME
 
 broker = f"pyamqp://{MQ_USER}:{MQ_PASSWORD}@{MQ_HOST}//"
 
@@ -86,22 +87,22 @@ class LoggedRetryTask(Task):
 
 @app.task(bind=True, name="save_image_volume")
 def task_save_image_volume(self, name: str, url: str, proxy: Dict):
-    path = "./volumes/"
-
     try:
+        os.makedirs(FOLDER_TO_IMAGE_VOLUME, exist_ok=True)  # Crée le dossier s’il n'existe pas
+
         if url is None:
             # print(f"[PROCESS VOLUME : {name}][IMAGE][NOT FOUND]")
 
             return False
 
-        if is_image_volume_existe_from_local(name, path):
+        if is_image_volume_existe_from_local(name, FOLDER_TO_IMAGE_VOLUME):
             # print(f"[PROCESS VOLUME : {name}][IMAGE][EXISTE]")
 
             return True
 
         # print(f"[PROCESS VOLUME : {name}][IMAGE][TELECHARGEMENT]")
 
-        save_image_from_url(url, name, path, proxy)
+        save_image_from_url(url, name, FOLDER_TO_IMAGE_VOLUME, proxy)
         time.sleep(1)
 
         return True
@@ -122,23 +123,7 @@ def task_save_database_volume(self, datas):
         raise self.retry(exc=e, countdown=60)
 
 
-def _save_sql(df):
-    # df.set_index(["YEAR","MONTH","DAY","HOUR"])
-
-    print(df.index.name)  # ← doit afficher None
-
-    df.to_sql(name=POSTGRES_TABLE, con=ENGINE, if_exists="append", index=False)
-
-
-def _save_csv(df):
-    folder = "./csv"
-    os.makedirs(folder, exist_ok=True)  # Crée le dossier s’il n'existe pas
-    title = str(df['serie_title'][0]).replace(' ', '_').replace("'", '_').upper()
-    filename = f"{title}.csv"
-    df.to_csv(path_or_buf=os.path.join(folder, filename), index=False)
-
-
-@app.task(bind=True, name="call_serie_api", base=LoggedRetryTask)
+@app.task(bind=True, name="call_serie_api")  # , base=LoggedRetryTask)
 def task_call_serie_api(self: Task, id: str, proxy: Dict) -> bool:
     """
 
@@ -146,26 +131,50 @@ def task_call_serie_api(self: Task, id: str, proxy: Dict) -> bool:
     :param proxy:
     :return:
     """
-
     proxy = format_proxy(proxy)
 
-    client_mangacollec = MangaCollecAPIClient(
-        client_id= CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        proxy=proxy
-
-    )
+    client_mangacollec = MangaCollecAPIClient(client_id=CLIENT_ID,client_secret=CLIENT_SECRET,proxy=proxy)
 
     serie_endpoint = SerieEndpoint(client_mangacollec)
 
     serie_endpoint_entity: SerieEndpointEntity = serie_endpoint.get_series_by_id_v2(id)
 
-    # netoyage donnee
+    datas, list_volume_images = _series_to_datas(serie_endpoint_entity)
 
+    # envoy a la queue pour la sauvgarde des volumes d'une serie
+    app.send_task("save_database_volume", args=[datas], queue="save_database_volume")
+
+    # envoy a la queue pour la sauvgarde de chaque image des volumes d'une serie
+    [
+        app.send_task("save_image_volume", args=[id, url, proxy], queue="save_image_volume")
+        for id, url in list_volume_images.items()
+    ]
+
+    return True
+
+
+def _series_to_datas(serie_endpoint_entity):
     datas: List[Dict[str, any]] = []
+    authors, editions, genre, jobs, serie, tasks, volumes = _tuple_to_serie_endpoint_entity(serie_endpoint_entity)
+    list_volume_images: Dict[str, str] = {}  # [volume_id, volume_image_url]
+    for volume in volumes:
+        list_volume_images[volume.id] = volume.image_url
+
+        data_volume = _init_data_volume(volume)
+
+        _add_serie_to_data(data_volume, serie)
+
+        _add_genre_to_data(data_volume, genre)
+
+        _add_editions_to_data(data_volume, editions)
+
+        _add_authors_to_data(data_volume, tasks, authors, jobs)
+
+        datas.append(data_volume)
+    return datas, list_volume_images
 
 
-
+def _tuple_to_serie_endpoint_entity(serie_endpoint_entity) -> Tuple:
     serie: Serie = serie_endpoint_entity.serie
     genre: Genre = serie_endpoint_entity.type
     kinds: List[str] = [str(kind) for kind in serie_endpoint_entity.kinds]
@@ -175,47 +184,58 @@ def task_call_serie_api(self: Task, id: str, proxy: Dict) -> bool:
     editions: List[Edition] = serie_endpoint_entity.editions
     publisher: Publisher = serie_endpoint_entity.publishers[0]
     volumes: List[Volume] = serie_endpoint_entity.volumes
+    return authors, editions, genre, jobs, serie, tasks, volumes
 
 
+def _save_sql(df) -> None:
+    # df.set_index(["YEAR","MONTH","DAY","HOUR"])
 
-    for volume in volumes:
-        data_volume = _init_data_volume(volume)
-
-        _add_serie_to_data(data_volume, serie)
-
-        _add_genre_to_data(data_volume, genre)
-
-        for edition in editions:
-            print(edition)
-
-            is_edition_to_volume_curent: bool = data_volume['edition_id'] == edition.id
-
-            if is_edition_to_volume_curent:
-                data_volume['edition_title'] = edition.title
-                data_volume['edition_parent_id'] = edition.parent_edition_id
-                data_volume['edition_volumes_count'] = edition.volumes_count
-                data_volume['edition_last_volume_number'] = edition.last_volume_number
-                data_volume['edition_commercial_stop'] = edition.commercial_stop
-                data_volume['edition_not_finished'] = edition.not_finished
-                data_volume['edition_follow_editions_count'] = edition.follow_editions_count
-
-        datas.append(data_volume)
-
-    # print(list_volume_images)
-
-    # envoy a la queue pour traitement donnee volumes
-    app.send_task("save_database_volume", args=[datas], queue="save_database_volume")
-
-    # envoy a la queue pour traitement images volumes
-    # [
-    #     app.send_task("save_image_volume", args=[id, url, proxy], queue="save_image_volume")
-    #     for id, url in list_volume_images.items()
-    # ]
-
-    return True
+    df.to_sql(name=POSTGRES_TABLE, con=ENGINE, if_exists="append", index=False)
 
 
-def _add_genre_to_data(data_volume, genre):
+def _save_csv(df) -> None:
+
+    os.makedirs(FOLDER_TO_CSV, exist_ok=True)  # Crée le dossier s’il n'existe pas
+
+    title = str(df['serie_title'][0]).replace(' ', '_').replace("'", '_').upper()
+
+    filename = f"{title}.csv"
+
+    df.to_csv(path_or_buf=os.path.join(FOLDER_TO_CSV, filename), index=False)
+
+
+def _add_editions_to_data(data_volume: Dict[str, any], editions: List[Edition]) -> None:
+    for edition in editions:
+        print(edition)
+
+        is_edition_to_volume_curent: bool = data_volume['edition_id'] == edition.id
+
+        if is_edition_to_volume_curent:
+            data_volume['edition_title'] = edition.title
+            data_volume['edition_parent_id'] = edition.parent_edition_id
+            data_volume['edition_volumes_count'] = edition.volumes_count
+            data_volume['edition_last_volume_number'] = edition.last_volume_number
+            data_volume['edition_commercial_stop'] = edition.commercial_stop
+            data_volume['edition_not_finished'] = edition.not_finished
+            data_volume['edition_follow_editions_count'] = edition.follow_editions_count
+
+
+def _add_authors_to_data(data_volume: Dict[str, any], tasks: List[Tache], authors: List[Author], jobs: List[Job]) -> None:
+    list_authors: List[Dict] = []
+    for task in tasks:
+        author: Author | None = next((author for author in authors if author.id == task.author_id), None)
+        job: Job | None = next((job for job in jobs if job.id == task.job_id), None)
+
+        list_authors.append({
+            "name": author.name,
+            "first_name": author.first_name,
+            "job": job.title
+        })
+
+        data_volume['authors'] = json.dumps(list_authors)
+
+
+def _add_genre_to_data(data_volume: Dict[str, any], genre: Genre) -> None:
     data_volume['type_id'] = genre.id
     data_volume['type_title'] = genre.title
     data_volume['type_to_display'] = genre.to_display
