@@ -112,8 +112,19 @@ def task_save_image_volume(self, name: str, url: str, proxy: Dict):
         return False
 
 
-@app.task(bind=True, name="save_database_volume", base=LoggedRetryTask)
+@app.task(bind=True, name="save_database_volume")#, base=LoggedRetryTask)
 def task_save_database_volume(self, datas):
+    df: DataFrame = pd.DataFrame(datas)
+
+    _save_sql(df)
+
+    try:
+        _save_csv(df)
+    except Exception as e:
+        raise self.retry(exc=e, countdown=60)
+
+
+def _save_sql(df):
     engine: Engine = create_engine(
         (
             f"postgresql+psycopg2://{POSTGRES_USER}:"
@@ -123,24 +134,19 @@ def task_save_database_volume(self, datas):
             f"{POSTGRES_DB}"
         )
     )
+    # df.set_index(["YEAR","MONTH","DAY","HOUR"])
 
-    df: DataFrame = pd.DataFrame(datas)
-    #df.set_index("id")
+    print(df.index.name)  # ← doit afficher None
 
-    df.to_sql(name=POSTGRES_TABLE, con=engine, if_exists="append")
+    df.to_sql(name=POSTGRES_TABLE, con=engine, if_exists="append", index=False)
 
+
+def _save_csv(df):
     folder = "./csv"
-
     os.makedirs(folder, exist_ok=True)  # Crée le dossier s’il n'existe pas
-
-    # filename = f"{str(df['serie_title'][0]).replace(' ', '_').replace('\'', '')}.csv"
-    
-    # df.to_csv(path_or_buf=os.path.join(folder, filename))
-    
-    # try:
-    #
-    # except Exception as e:
-    #     raise self.retry(exc=e, countdown=60)
+    title = str(df['serie_title'][0]).replace(' ', '_').replace("'", '_').upper()
+    filename = f"{title}.csv"
+    df.to_csv(path_or_buf=os.path.join(folder, filename), index=False)
 
 
 @app.task(bind=True, name="call_serie_api", base=LoggedRetryTask)
